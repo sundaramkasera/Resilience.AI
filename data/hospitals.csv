@@ -1,0 +1,11 @@
+hospital_id,name,capacity,has_backup_power,lat,lon
+Hospital 1,City Care 1,767,False,28.6032,77.2635
+Hospital 2,City Care 2,223,False,28.6498,77.1726
+Hospital 3,City Care 3,648,True,28.5678,77.2054
+Hospital 4,City Care 4,353,False,28.6566,77.2169
+Hospital 5,City Care 5,476,False,28.6506,77.1667
+Hospital 6,City Care 6,334,False,28.611,77.2574
+Hospital 7,City Care 7,160,True,28.606,77.2129
+Hospital 8,City Care 8,327,True,28.6483,77.1855
+Hospital 9,City Care 9,488,False,28.6434,77.2498
+Hospital 10,City Care 10,659,True,28.5783,77.1823

@@ -1,0 +1,6 @@
+substation_id,name,status,lat,lon
+Sub-1,Substation 1,Online,28.6218,77.2625
+Sub-2,Substation 2,Online,28.6178,77.2665
+Sub-3,Substation 3,Online,28.659,77.2646
+Sub-4,Substation 4,Online,28.609,77.2489
+Sub-5,Substation 5,Online,28.6337,77.2254

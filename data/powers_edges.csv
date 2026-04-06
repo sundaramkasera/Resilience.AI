@@ -1,0 +1,24 @@
+from_id,to_id,max_capacity,current_load
+Sub-1,Hospital 1,500,300
+Sub-1,Hospital 2,500,400
+Sub-1,Tower-1,200,150
+Sub-1,Pump-1,300,250
+Sub-2,Hospital 3,600,450
+Sub-2,Hospital 4,600,300
+Sub-2,Tower-4,200,180
+Sub-2,Pump-2,300,280
+Sub-3,Hospital 5,1000,950
+Sub-3,Hospital 6,1000,800
+Sub-3,Hospital 7,1000,850
+Sub-3,Hospital 8,1000,900
+Sub-3,Tower-2,400,350
+Sub-3,Tower-3,400,380
+Sub-3,Tower-5,400,390
+Sub-3,Pump-4,500,480
+Sub-3,Pump-5,500,490
+Sub-4,Hospital 9,400,200
+Sub-4,Hospital 1,400,350
+Sub-4,Tower-1,200,190
+Sub-5,Hospital 10,700,400
+Sub-5,Hospital 3,700,600
+Sub-5,Pump-3,300,210

@@ -1,0 +1,198 @@
+import streamlit as st
+import re
+import json
+import os
+import requests
+from dotenv import load_dotenv
+from tigergraph_client import get_tg_connection
+from agent import get_resilience_agent
+
+load_dotenv()
+st.set_page_config(layout="wide", page_title="⚡Resilience.AI")
+
+@st.cache_resource
+def init_connection():
+    try:
+        return get_tg_connection()
+    except Exception as e:
+        return None
+
+conn = init_connection()
+
+col_controls, col_map = st.columns([1, 3])
+
+with col_controls:
+    st.write("# ⚡ Resilience.AI")
+    st.markdown("---")
+
+    if "messages" not in st.session_state:
+        st.session_state.messages = [{"role": "assistant", "content": "⚡ Commander, Resilience.AI is online. Standing by for macro-city queries."}]
+
+    if "pending_input" not in st.session_state:
+        st.session_state.pending_input = ""
+        
+    if "offline_nodes" not in st.session_state:
+        st.session_state.offline_nodes = []
+        
+    if "spof_node" not in st.session_state:
+        st.session_state.spof_node = None
+
+    def handle_submit():
+        st.session_state.pending_input = st.session_state.user_input_widget
+        st.session_state.user_input_widget = ""
+
+    st.text_input(
+        "Query Input", 
+        key="user_input_widget",
+        label_visibility="collapsed", 
+        placeholder="Ask Resilience AI (e.g., 'Target power failures')...",
+        on_change=handle_submit
+    )
+
+    scan_button = st.button("⚠️ Run Vulnerability Scan", use_container_width=True)
+    if scan_button:
+        st.session_state.pending_input = "Run a vulnerability scan to find the Single Point of Failure (SPOF)."
+
+    weather_button = st.button("🌩️ Assess Weather Risks", use_container_width=True)
+    if weather_button:
+        st.session_state.pending_input = "Severe weather detected. Assess infrastructure flood risks for Substations and WaterPumps."
+
+    # --- WAR ROOM CHAT ---
+    st.markdown("---")
+    st.subheader("🚨 War Room Chat")
+    
+    chat_container = st.container(height=450, border=True)
+
+    user_input = st.session_state.pending_input
+    if user_input and conn:
+        agent_executor = get_resilience_agent()
+
+        with st.spinner("Analyzing City Grid..."):
+            response = agent_executor.invoke({"input": user_input})
+
+        raw_output = response['output']
+        json_pattern = r"```json\s*(\{.*?\})\s*```"
+        match = re.search(json_pattern, raw_output, re.DOTALL)
+
+        if match:
+            final_response_text = re.sub(json_pattern, "", raw_output, flags=re.DOTALL).strip()
+            try:
+                ui_payload = json.loads(match.group(1))
+                
+                if "affected_nodes" in ui_payload:
+                    st.session_state.offline_nodes = ui_payload.get("affected_nodes", [])
+                    st.session_state.spof_node = None
+                    
+                if "spof_node" in ui_payload:
+                    st.session_state.spof_node = ui_payload.get("spof_node")
+                    st.session_state.offline_nodes = []
+                    
+            except Exception as e:
+                print(f"JSON Parsing Error: {e}")
+        else:
+            final_response_text = raw_output
+            if "simulate" not in user_input.lower() and "scan" not in user_input.lower() and "weather" not in user_input.lower():
+                st.session_state.offline_nodes = []
+                st.session_state.spof_node = None
+
+        st.session_state.messages.insert(0, {"role": "user", "content": user_input})
+        st.session_state.messages.insert(1, {"role": "assistant", "content": final_response_text})
+        
+        st.session_state.pending_input = ""
+
+    with chat_container:
+        for message in st.session_state.messages:
+            if message["role"] == "user":
+                st.chat_message("user").write(message["content"])
+            elif message["role"] == "assistant":
+                st.chat_message("assistant").write(message["content"])
+
+with col_map:
+    # --- RENDER MAP ---
+    if conn:
+        try:
+            from graph_renderer import render_macro_graph 
+            map_chart = render_macro_graph(
+                affected_nodes=st.session_state.offline_nodes, 
+                spof_node=st.session_state.spof_node
+            )
+            st.pydeck_chart(map_chart, use_container_width=True)
+        except Exception as e:
+            st.error(f"Map Rendering Error: {e}")
+    else:
+        st.warning("Cannot render map. Database connection required.")
+        
+    # --- PHASE 6: AUTO-REFRESHING HORIZONTAL IOT DASHBOARD (MOVED TO TOP) ---
+    @st.fragment(run_every=15)
+    def live_telemetry_dashboard():
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.subheader("📡 Live Substation Telemetry")
+            
+        try:
+            if os.path.exists("telemetry_stream.json"):
+                with open("telemetry_stream.json", "r") as f:
+                    telemetry = json.load(f)
+                    
+                subs = ["Sub-1", "Sub-2", "Sub-3", "Sub-4", "Sub-5"]
+                cols = st.columns(5)
+                critical_alarms = []
+                
+                for i, sub in enumerate(subs):
+                    data = telemetry.get(sub, {"temperature": 0, "load": 0})
+                    temp = data["temperature"]
+                    load = data["load"]
+                    
+                    with cols[i]:
+                        st.write(f"**{sub}**")
+                        if temp > 100:
+                            st.markdown(f"<h2 style='color: #ff4b4b; margin-top: -15px;'>{temp}°C</h2>", unsafe_allow_html=True)
+                            st.markdown(f"<span style='background-color: #ff4b4b33; color: #ff4b4b; padding: 4px 10px; border-radius: 12px; font-size: 0.85rem;'>↑ {load}% Load</span>", unsafe_allow_html=True)
+                            critical_alarms.append((sub, temp, load))
+                        else:
+                            st.markdown(f"<h2 style='margin-top: -15px;'>{temp}°C</h2>", unsafe_allow_html=True)
+                            st.markdown(f"<span style='background-color: #ff4b4b33; color: #ff4b4b; padding: 4px 10px; border-radius: 12px; font-size: 0.85rem;'>↑ {load}% Load</span>", unsafe_allow_html=True)
+                            
+                if critical_alarms:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    for alarm in critical_alarms:
+                        st.error(f"⚠️ **CRITICAL ALARM:** {alarm[0]} is Overheating! (Temp: {alarm[1]}°C | Load: {alarm[2]}%)")
+                        
+            else:
+                st.info("Telemetry stream offline. Run telemetry_simulator.py")
+        except Exception as e:
+            st.caption(f"Telemetry error: {e}")
+
+    live_telemetry_dashboard()
+    
+    st.markdown("---")
+
+    # --- PHASE 6: AUTO-REFRESHING WEATHER RADAR (MOVED TO BOTTOM) ---
+    @st.fragment(run_every=600)
+    def live_weather_radar():
+        st.subheader("🌩️ Live Weather Radar (Delhi)")
+        
+        api_key = os.getenv("OPENWEATHER_API_KEY")
+        if not api_key:
+            st.info("⚠️ Add OPENWEATHER_API_KEY to your .env file to enable live weather.")
+            return
+
+        try:
+            url = f"http://api.openweathermap.org/data/2.5/weather?lat=28.6139&lon=77.2090&appid={api_key}&units=metric"
+            resp = requests.get(url).json()
+            
+            if resp.get("cod") == 200:
+                weather_desc = resp['weather'][0]['description'].title()
+                temp = resp['main']['temp']
+                st.write(f"**Current Conditions:** {temp}°C | {weather_desc}")
+                
+                weather_id = resp['weather'][0]['id']
+                if weather_id < 700:
+                    st.error("⚠️ **SEVERE WEATHER ALERT:** Storm/Heavy Precipitation detected in grid bounds. Use the 'Assess Weather Risks' button to scan infrastructure.")
+                else:
+                    st.success("✅ **CLEAR SKIES:** No severe weather threats detected in the grid bounds.")
+            else:
+                st.caption(f"Weather API Error: {resp.get('message', 'Unknown Error')}")
+        except Exception as e:
+            st.caption(f"Weather Fetch Error: {e}")
+
+    live_weather_radar()
