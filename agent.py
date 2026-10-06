@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from langchain_core.tools import tool
 from langchain_groq import ChatGroq
-from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langgraph.prebuilt import create_react_agent
 from langchain_core.prompts import ChatPromptTemplate
 from tigergraph_client import get_tg_connection
 from pydantic import BaseModel, Field
@@ -93,9 +93,7 @@ When asked about blast radius or cascading failures, use `calculate_blast_radius
 When asked about vulnerabilities or SPOF, use `find_single_point_of_failure`.
 """
 print("📍 TRACE: agent.py - Initializing Power Grid Agent")
-power_prompt = ChatPromptTemplate.from_messages([("system", power_sys_prompt), ("human", "{input}"), ("placeholder", "{agent_scratchpad}")])
-power_agent = create_tool_calling_agent(llm, tg_tools, power_prompt)
-power_executor = AgentExecutor(agent=power_agent, tools=tg_tools, verbose=True, max_iterations=4, handle_parsing_errors=True)
+power_executor = create_react_agent(llm, tools=tg_tools, state_modifier=power_sys_prompt)
 print("📍 TRACE: agent.py - Power Grid Agent initialized")
 
 @tool
@@ -104,7 +102,8 @@ def run_power_grid(query: str) -> str:
     Delegate queries about electricity, substations, blast radius, SPOF, telecom power loss, or flooding to this agent.
     Pass a clear instruction as the 'query' string parameter.
     """
-    return power_executor.invoke({"input": query})["output"]
+    result = power_executor.invoke({"messages": [("user", query)]})
+    return result["messages"][-1].content
 
 
 # --- 2. LOGISTICS AGENT ---
@@ -115,9 +114,7 @@ You have access to specialized tools: `route_emergency_logistics`.
 When queried by the Commander (e.g., to dispatch backup generators to an affected Hospital), formulate a brief dispatch plan using your tools.
 """
 print("📍 TRACE: agent.py - Initializing Logistics Agent")
-logistics_prompt = ChatPromptTemplate.from_messages([("system", logistics_sys_prompt), ("human", "{input}"), ("placeholder", "{agent_scratchpad}")])
-logistics_agent = create_tool_calling_agent(llm, tg_tools, logistics_prompt)
-logistics_executor = AgentExecutor(agent=logistics_agent, tools=tg_tools, verbose=True, max_iterations=4, handle_parsing_errors=True)
+logistics_executor = create_react_agent(llm, tools=tg_tools, state_modifier=logistics_sys_prompt)
 print("📍 TRACE: agent.py - Logistics Agent initialized")
 
 @tool
@@ -126,7 +123,8 @@ def run_logistics(query: str) -> str:
     Delegate queries about physical routing, dispatching backup generators, road networks, and hospital supply lines to this agent.
     Pass a clear instruction as the 'query' string parameter.
     """
-    return logistics_executor.invoke({"input": query})["output"]
+    result = logistics_executor.invoke({"messages": [("user", query)]})
+    return result["messages"][-1].content
 
 
 class SimulationResponse(BaseModel):
@@ -147,22 +145,8 @@ def get_resilience_agent():
     3. Synthesize their reports into a clean, professional "Commander's Dispatch Brief".
     """
     
-    commander_prompt = ChatPromptTemplate.from_messages([
-        ("system", commander_system_prompt),
-        ("human", "{input}"),
-        ("placeholder", "{agent_scratchpad}"),
-    ])
-    
     commander_tools = [run_power_grid, run_logistics]
-    commander_agent = create_tool_calling_agent(llm, commander_tools, commander_prompt)
-    
-    executor = AgentExecutor(
-        agent=commander_agent, 
-        tools=commander_tools, 
-        verbose=True, 
-        max_iterations=5, 
-        handle_parsing_errors=True
-    )
+    executor = create_react_agent(llm, tools=commander_tools, state_modifier=commander_system_prompt)
     
     # We create a chain that takes the executor output and formats it into SimulationResponse
     # This ensures we get a structured object back
@@ -174,7 +158,8 @@ def get_resilience_agent():
     structured_llm = llm.with_structured_output(SimulationResponse)
     
     def run_commander(user_input: str) -> SimulationResponse:
-        result = executor.invoke({"input": user_input})
-        return structured_llm.invoke(format_prompt.format(text=result["output"]))
+        result = executor.invoke({"messages": [("user", user_input)]})
+        final_text = result["messages"][-1].content
+        return structured_llm.invoke(format_prompt.format(text=final_text))
         
     return run_commander
