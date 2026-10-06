@@ -1,23 +1,29 @@
+import os
+from dotenv import load_dotenv
+load_dotenv()
+print("📍 TRACE: app.py - Starting imports")
 import streamlit as st
 import re
 import json
-import os
 import requests
-from dotenv import load_dotenv
 from tigergraph_client import get_tg_connection
+print("📍 TRACE: app.py - Importing agent")
 from agent import get_resilience_agent
-
-load_dotenv()
+print("📍 TRACE: app.py - Imports complete")
+print("📍 TRACE: app.py - Setting page config")
 st.set_page_config(layout="wide", page_title="⚡Resilience.AI")
 
 @st.cache_resource
 def init_connection():
     try:
+        print("📍 TRACE: app.py - Inside init_connection, calling get_tg_connection")
         return get_tg_connection()
     except Exception as e:
         return None
 
+print("📍 TRACE: app.py - Calling init_connection")
 conn = init_connection()
+print("📍 TRACE: app.py - Connection initialized")
 
 col_controls, col_map = st.columns([1, 3])
 
@@ -25,6 +31,7 @@ with col_controls:
     st.write("# ⚡ Resilience.AI")
     st.markdown("---")
 
+    print("📍 TRACE: app.py - Setting up session state")
     if "messages" not in st.session_state:
         st.session_state.messages = [{"role": "assistant", "content": "⚡ Commander, Resilience.AI is online. Standing by for macro-city queries."}]
 
@@ -116,7 +123,7 @@ with col_map:
                 affected_nodes=st.session_state.offline_nodes, 
                 spof_node=st.session_state.spof_node
             )
-            st.pydeck_chart(map_chart, use_container_width=True)
+            st.pydeck_chart(map_chart, width="stretch")
         except Exception as e:
             st.error(f"Map Rendering Error: {e}")
     else:

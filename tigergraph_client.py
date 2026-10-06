@@ -1,29 +1,36 @@
+import os
 import pyTigerGraph as tg
+import traceback
 
 def get_tg_connection():
     print("🟢 System: Initializing native pyTigerGraph SDK...")
-    host = "https://tg-75e570ca-6b56-4d89-a0d5-00d9c066b0d9.tg-3452941248.i.tgcloud.io"
-    graphname = "ResilienceGraph"
-    username = "tigergraph"
-    password = "Sundaram@123"
-    
-    # The secret key needed to generate the REST++ token
-    secret = "707sk3354kutptl7m0nlmcuas25h78na"
+    host = os.getenv("TG_HOST", "")
+    graphname = os.getenv("TG_GRAPH", "")
+    username = os.getenv("TG_USERNAME", "")
+    password = os.getenv("TG_PASSWORD", "")
+    secret = os.getenv("TG_SECRET", "")
     
     try:
         conn = tg.TigerGraphConnection(
             host=host, 
             graphname=graphname, 
             username=username, 
-            password=password
+            password=password,
+            tgCloud=True
         )
         
-        # MONKEY-PATCH: Manually inject the cloud ports to bypass the library bug
-        conn.restppPort = 443
-        conn.gsPort = 443
         conn.getToken(secret)
         print("🟢 System: pyTigerGraph token successfully generated!")
         return conn
+        
     except Exception as e:
-        print(f"🔴 Connection Error: {e}")
-        raise e
+        print("\n🔴 --- FULL SYSTEM TRACEBACK BELOW --- 🔴")
+        traceback.print_exc()
+        print("🔴 ----------------------------------- 🔴\n")
+        # Returning None instead of raising 'e' so it prints cleanly
+        return None
+
+# 👇 THIS TRIGGERS THE FUNCTION WHEN YOU RUN THE FILE DIRECTLY 👇
+if __name__ == "__main__":
+    print("🚀 Starting direct execution test...")
+    get_tg_connection()
