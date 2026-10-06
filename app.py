@@ -32,6 +32,22 @@ print("📍 TRACE: app.py - Connection initialized")
 
 col_controls, col_map = st.columns([1, 3])
 
+with col_map:
+    # --- RENDER MAP ---
+    map_container = st.empty()
+    if conn:
+        try:
+            from graph_renderer import render_macro_graph 
+            map_chart = render_macro_graph(
+                affected_nodes=st.session_state.get("offline_nodes", []), 
+                spof_node=st.session_state.get("spof_node")
+            )
+            map_container.pydeck_chart(map_chart, width="stretch")
+        except Exception as e:
+            st.error(f"Map Rendering Error: {e}")
+    else:
+        st.warning("Cannot render map. Database connection required.")
+
 with col_controls:
     st.write("# ⚡ Resilience.AI")
     st.markdown("---")
@@ -82,6 +98,8 @@ with col_controls:
         with st.spinner("Analyzing City Grid..."):
             response = run_commander(user_input)
 
+        st.caption(f"Debug - Extracted SPOF: {response.spof_node}")
+        
         final_response_text = response.summary
         
         # UI fails silently (no highlight) if spof_node is invalid or empty
@@ -96,6 +114,17 @@ with col_controls:
                 st.session_state.offline_nodes = []
                 st.session_state.spof_node = None
 
+        if conn:
+            try:
+                from graph_renderer import render_macro_graph 
+                updated_map = render_macro_graph(
+                    affected_nodes=st.session_state.offline_nodes, 
+                    spof_node=st.session_state.spof_node
+                )
+                map_container.pydeck_chart(updated_map, width="stretch")
+            except Exception as e:
+                pass
+
         st.session_state.messages.insert(0, {"role": "user", "content": user_input})
         st.session_state.messages.insert(1, {"role": "assistant", "content": final_response_text})
         
@@ -109,20 +138,6 @@ with col_controls:
                 st.chat_message("assistant").write(message["content"])
 
 with col_map:
-    # --- RENDER MAP ---
-    if conn:
-        try:
-            from graph_renderer import render_macro_graph 
-            map_chart = render_macro_graph(
-                affected_nodes=st.session_state.offline_nodes, 
-                spof_node=st.session_state.spof_node
-            )
-            st.pydeck_chart(map_chart, width="stretch")
-        except Exception as e:
-            st.error(f"Map Rendering Error: {e}")
-    else:
-        st.warning("Cannot render map. Database connection required.")
-        
     # --- PHASE 6: AUTO-REFRESHING HORIZONTAL IOT DASHBOARD (MOVED TO TOP) ---
     @st.fragment(run_every="2s")
     def live_telemetry_dashboard():

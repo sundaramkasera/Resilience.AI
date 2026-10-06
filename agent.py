@@ -155,7 +155,8 @@ def get_resilience_agent():
         ("human", "{text}")
     ])
     
-    structured_llm = llm.with_structured_output(SimulationResponse)
+    fast_llm = ChatGroq(temperature=0, model_name="llama3-8b-8192")
+    structured_llm = fast_llm.with_structured_output(SimulationResponse)
     
     def run_commander(user_input: str) -> SimulationResponse:
         result = executor.invoke({"messages": [("user", user_input)]})
