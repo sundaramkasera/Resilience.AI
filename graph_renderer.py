@@ -4,7 +4,7 @@ import pandas as pd
 import streamlit as st
 from tigergraph_client import get_tg_connection
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_resource(show_spinner=False)
 def get_static_infrastructure_layer(_conn):
     subs = _conn.getVertices("Substation")
     hospitals = _conn.getVertices("Hospital")
