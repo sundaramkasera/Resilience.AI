@@ -124,7 +124,7 @@ with col_map:
         st.warning("Cannot render map. Database connection required.")
         
     # --- PHASE 6: AUTO-REFRESHING HORIZONTAL IOT DASHBOARD (MOVED TO TOP) ---
-    @st.fragment(run_every=15)
+    @st.fragment(run_every="2s")
     def live_telemetry_dashboard():
         st.markdown("<br>", unsafe_allow_html=True)
         st.subheader("📡 Live Substation Telemetry")
@@ -171,6 +171,11 @@ with col_map:
     st.markdown("---")
 
     # --- PHASE 6: AUTO-REFRESHING WEATHER RADAR (MOVED TO BOTTOM) ---
+    @st.cache_data(ttl=300, show_spinner=False)
+    def fetch_weather_data(api_key):
+        url = f"http://api.openweathermap.org/data/2.5/weather?lat=28.6139&lon=77.2090&appid={api_key}&units=metric"
+        return requests.get(url).json()
+
     @st.fragment(run_every=600)
     def live_weather_radar():
         st.subheader("🌩️ Live Weather Radar (Delhi)")
@@ -181,8 +186,7 @@ with col_map:
             return
 
         try:
-            url = f"http://api.openweathermap.org/data/2.5/weather?lat=28.6139&lon=77.2090&appid={api_key}&units=metric"
-            resp = requests.get(url).json()
+            resp = fetch_weather_data(api_key)
             
             if resp.get("cod") == 200:
                 weather_desc = resp['weather'][0]['description'].title()

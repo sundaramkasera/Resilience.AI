@@ -2,10 +2,12 @@ import os
 import time
 import pyTigerGraph as tg
 import traceback
+import streamlit as st
 
 class TigerGraphConnectionError(Exception):
     pass
 
+@st.cache_resource(show_spinner=False)
 def get_tg_connection():
     print("🟢 System: Initializing native pyTigerGraph SDK...")
     host = os.getenv("TG_HOST", "")
