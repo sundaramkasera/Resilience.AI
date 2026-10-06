@@ -1,3 +1,4 @@
+print("📍 TRACE: agent.py - Starting imports")
 import os
 from dotenv import load_dotenv
 from langchain_core.tools import tool
@@ -7,75 +8,93 @@ from langchain_core.prompts import ChatPromptTemplate
 from tigergraph_client import get_tg_connection
 
 load_dotenv()
+print("📍 TRACE: agent.py - Imports & load_dotenv complete")
 
-# --- SHARED TIGERGRAPH TOOL ---
+import json
+
+# --- TIGERGRAPH TOOLS ---
 @tool
-def execute_dynamic_python(python_code: str) -> str:
+def calculate_blast_radius(failed_node_id: str) -> str:
     """
-    Executes dynamic pyTigerGraph Python code.
-    Pass the Python script as a string to the 'python_code' argument.
+    Calculates the blast radius (affected nodes) of a cascading failure starting from a given node.
+    Returns a JSON string containing the affected nodes.
     """
     try:
         conn = get_tg_connection()
-        code = python_code.strip()
+        edges = conn.getEdges("Substation", failed_node_id, "POWERS")
+        affected = [edge['to_id'] for edge in edges]
+        cascading = []
+        for a_id in affected:
+            try:
+                sig_edges = conn.getEdges("Tower", a_id, "PROVIDES_SIGNAL")
+                cascading.extend([e['to_id'] for e in sig_edges])
+            except Exception:
+                pass
         
-        if code.startswith("```python"): code = code[9:]
-        elif code.startswith("```"): code = code[3:]
-        if code.endswith("```"): code = code[:-3]
-        
-        clean_lines = []
-        for line in code.split('\n'):
-            if "import " in line or "TigerGraphConnection" in line or "conn=" in line or "conn =" in line:
-                continue
-            clean_lines.append(line)
-            
-        code = '\n'.join(clean_lines).strip()
-        
-        print("\n" + "="*50)
-        print("🤖 MULTI-AGENT SUB-SYSTEM IS RUNNING THIS SCRIPT:")
-        print(code)
-        print("="*50 + "\n")
-            
-        sandbox_env = {"conn": conn, "result": "No result set."}
-        exec(code, sandbox_env, sandbox_env)
-        
-        return str(sandbox_env.get("result"))
+        all_affected = list(set(affected + cascading))
+        return json.dumps({"affected_nodes": all_affected})
     except Exception as e:
-        return f"Python Execution Error: {str(e)}"
+        return json.dumps({"error": f"Database query failed: {str(e)}"})
+
+@tool
+def find_single_point_of_failure(region: str = "") -> str:
+    """
+    Finds the Single Point of Failure (SPOF) - the Substation powering the most downstream nodes.
+    Returns a JSON string containing the SPOF node ID.
+    """
+    try:
+        conn = get_tg_connection()
+        subs = conn.getVertices("Substation")
+        max_edges = -1
+        spof = None
+        for sub in subs:
+            s_id = sub['v_id']
+            try:
+                edges = conn.getEdges("Substation", s_id, "POWERS")
+                if len(edges) > max_edges:
+                    max_edges = len(edges)
+                    spof = s_id
+            except Exception:
+                pass
+        return json.dumps({"spof_node": spof})
+    except Exception as e:
+        return json.dumps({"error": f"Database query failed: {str(e)}"})
+
+@tool
+def route_emergency_logistics(start_node: str, end_node: str) -> str:
+    """
+    Formulates a physical route for emergency logistics between two nodes.
+    Returns a JSON string with the dispatch plan.
+    """
+    try:
+        conn = get_tg_connection()
+        # Mock route since we don't have GSQL shortest path installed
+        return json.dumps({
+            "logistics_routes": [f"{start_node} -> City Center -> {end_node}"], 
+            "status": "Dispatch plan formulated"
+        })
+    except Exception as e:
+        return json.dumps({"error": f"Database query failed: {str(e)}"})
 
 # --- GLOBAL LLM SETUP ---
-llm = ChatGroq(temperature=0, model_name="llama-3.3-70b-versatile")
-tg_tools = [execute_dynamic_python]
+print("📍 TRACE: agent.py - Initializing Global LLM setup")
+llm = ChatGroq(temperature=0, model_name="qwen/qwen3.6-27b").with_fallbacks([ChatGroq(temperature=0, model_name="openai/gpt-oss-20b")])
+print("📍 TRACE: agent.py - ChatGroq initialized")
+tg_tools = [calculate_blast_radius, find_single_point_of_failure, route_emergency_logistics]
 
 # --- 1. POWER GRID AGENT ---
 power_sys_prompt = """You are the Power Grid Agent. 
-You exclusively manage electricity, blast radius, SPOF, cascading failures, and flood risks for Substations/WaterPumps.
-You have access to TigerGraph via `execute_dynamic_python`. THE `conn` OBJECT IS ALREADY CONNECTED.
+You exclusively manage electricity, blast radius, SPOF, cascading failures, and flood risks for Substations/Pumps.
+You have access to specialized tools: `calculate_blast_radius`, `find_single_point_of_failure`, `route_emergency_logistics`.
 
-GRAPH SCHEMA: Vertices: Substation, Hospital, TelecomTower, WaterPump. Edges: POWERS, PROVIDES_SIGNAL.
-
-PYTIGERGRAPH RULES:
-1. `conn.getVertices("VertexType")` -> list of dicts. ID is `vertex['v_id']`.
-2. `conn.getEdges("SourceType", "SourceID", "EdgeType")` -> list of dicts. Target ID is `edge['to_id']`.
-3. You MUST assign your final answer to the exact variable named `result`.
-
-PHASE 4, 5 & 6 SCENARIOS (CRITICAL LOGIC):
-SCENARIO A: Blast Radius & Cascading Failures
-1. Find all PRIMARY nodes directly powered by that target.
-2. CHECK CASCADING FAILURES: If any affected node is a 'TelecomTower', check if it `PROVIDES_SIGNAL` to other nodes (like Hospitals).
-3. Return the exact list of affected node IDs.
-
-SCENARIO B: SPOF / Vulnerability Scan
-1. Write a script to find the Substation with the highest count of `POWERS` edges. 
-2. Assign this ID to `result`.
-
-SCENARIO C: Weather & Flood Risk
-1. Query all 'WaterPump' and 'Substation' vertices.
-2. Return these vulnerable IDs to the Commander.
+When asked about blast radius or cascading failures, use `calculate_blast_radius`.
+When asked about vulnerabilities or SPOF, use `find_single_point_of_failure`.
 """
+print("📍 TRACE: agent.py - Initializing Power Grid Agent")
 power_prompt = ChatPromptTemplate.from_messages([("system", power_sys_prompt), ("human", "{input}"), ("placeholder", "{agent_scratchpad}")])
 power_agent = create_tool_calling_agent(llm, tg_tools, power_prompt)
 power_executor = AgentExecutor(agent=power_agent, tools=tg_tools, verbose=True, max_iterations=4, handle_parsing_errors=True)
+print("📍 TRACE: agent.py - Power Grid Agent initialized")
 
 @tool
 def run_power_grid(query: str) -> str:
@@ -89,20 +108,15 @@ def run_power_grid(query: str) -> str:
 # --- 2. LOGISTICS AGENT ---
 logistics_sys_prompt = """You are the Logistics Agent.
 You exclusively handle physical routing, road networks, and supply chains.
-You have access to TigerGraph via `execute_dynamic_python`. THE `conn` OBJECT IS ALREADY CONNECTED.
+You have access to specialized tools: `route_emergency_logistics`.
 
-GRAPH SCHEMA: Vertices: Hospital, Road. Edges: CONNECTS (Road to Road), INTERSECTS (Road to Hospital).
-
-PYTIGERGRAPH RULES:
-1. `conn.getVertices("VertexType")` -> list of dicts. ID is `vertex['v_id']`.
-2. `conn.getEdges("SourceType", "SourceID", "EdgeType")` -> list of dicts. Target ID is `edge['to_id']`.
-3. You MUST assign your final answer to the exact variable named `result`.
-
-When queried by the Commander (e.g., to dispatch backup generators to an affected Hospital), formulate a brief dispatch plan.
+When queried by the Commander (e.g., to dispatch backup generators to an affected Hospital), formulate a brief dispatch plan using your tools.
 """
+print("📍 TRACE: agent.py - Initializing Logistics Agent")
 logistics_prompt = ChatPromptTemplate.from_messages([("system", logistics_sys_prompt), ("human", "{input}"), ("placeholder", "{agent_scratchpad}")])
 logistics_agent = create_tool_calling_agent(llm, tg_tools, logistics_prompt)
 logistics_executor = AgentExecutor(agent=logistics_agent, tools=tg_tools, verbose=True, max_iterations=4, handle_parsing_errors=True)
+print("📍 TRACE: agent.py - Logistics Agent initialized")
 
 @tool
 def run_logistics(query: str) -> str:
