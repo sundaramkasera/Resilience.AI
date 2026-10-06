@@ -42,19 +42,35 @@ Plans:
   2. TigerGraph connection failures surface visibly in the UI and automatically retry.
   3. Map rendering does not block on `time.sleep()`, using separate static and dynamic layers.
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 
 Plans:
 - [x] 02-01: Implement `filelock` for atomic writes on `telemetry_stream.json`.
 - [x] 02-02: Implement exponential backoff retries and UI error surfacing for TigerGraph connections.
-- [ ] 02-03: Refactor PyDeck map rendering into static cache and dynamic memory layers.
+- [x] 02-03: Refactor PyDeck map rendering into static cache and dynamic memory layers.
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2
+Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Security & Deterministic AI | 3/3 | Complete | 2026-10-06 |
-| 2. Concurrency & Performance | 2/3 | In Progress | - |
+| 2. Concurrency & Performance | 3/3 | Complete | 2026-10-06 |
+| 3. LangGraph Migration | 0/1 | Not Started | - |
+
+### Phase 3: LangGraph Migration
+
+**Goal**: Upgrade deprecated LangChain v0.2 agent executors to LangGraph `create_react_agent` for v0.3 compatibility.
+**Depends on**: Phase 2
+**Requirements**: TECH-01
+**Success Criteria** (what must be TRUE):
+  1. `AgentExecutor` and `create_tool_calling_agent` are removed.
+  2. Agents are initialized with `create_react_agent`.
+  3. `SimulationResponse` structured output is fully preserved.
+
+**Plans**: 1 plan
+
+Plans:
+- [ ] 03-01: Migrate agent setup and invocation to LangGraph.
