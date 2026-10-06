@@ -1,6 +1,7 @@
 import json
 import time
 import random
+import os
 
 def run_telemetry():
     print("🟢 Starting IoT Telemetry Stream (Press CTRL+C to stop)...")
@@ -20,8 +21,9 @@ def run_telemetry():
                 "load": random.randint(40, 99)
             }
         
-        with open("telemetry_stream.json", "w") as f:
+        with open("telemetry_stream.tmp.json", "w") as f:
             json.dump(telemetry_data, f)
+        os.replace("telemetry_stream.tmp.json", "telemetry_stream.json")
         
         print(f"📡 Telemetry Updated: {telemetry_data}")
         time.sleep(15)  # Update every 15 seconds

@@ -126,8 +126,11 @@ with col_map:
             
         try:
             if os.path.exists("telemetry_stream.json"):
-                with open("telemetry_stream.json", "r") as f:
-                    telemetry = json.load(f)
+                try:
+                    with open("telemetry_stream.json", "r") as f:
+                        telemetry = json.load(f)
+                except (FileNotFoundError, json.JSONDecodeError, PermissionError):
+                    telemetry = {}
                     
                 subs = ["Sub-1", "Sub-2", "Sub-3", "Sub-4", "Sub-5"]
                 cols = st.columns(5)
