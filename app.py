@@ -93,49 +93,63 @@ with col_controls:
     user_input = st.session_state.pending_input
 
     if user_input and conn:
-        run_commander = get_resilience_agent()
+        executor = get_resilience_agent()
 
-        with st.spinner("Analyzing City Grid..."):
-            response = run_commander(user_input)
-
-        st.caption(f"Debug - Extracted SPOF: {response.spof_node}")
-        
-        final_response_text = response.summary
-        
-        # UI fails silently (no highlight) if spof_node is invalid or empty
-        if response.spof_node:
-            st.session_state.spof_node = response.spof_node
+        if "simulate" not in user_input.lower() and "scan" not in user_input.lower() and "weather" not in user_input.lower():
             st.session_state.offline_nodes = []
-        elif response.affected_nodes:
-            st.session_state.offline_nodes = response.affected_nodes
             st.session_state.spof_node = None
-        else:
-            if "simulate" not in user_input.lower() and "scan" not in user_input.lower() and "weather" not in user_input.lower():
-                st.session_state.offline_nodes = []
-                st.session_state.spof_node = None
 
-        if conn:
-            try:
-                from graph_renderer import render_macro_graph 
-                updated_map = render_macro_graph(
-                    affected_nodes=st.session_state.offline_nodes, 
-                    spof_node=st.session_state.spof_node
-                )
-                map_container.pydeck_chart(updated_map, width="stretch")
-            except Exception as e:
-                pass
-
-        st.session_state.messages.insert(0, {"role": "user", "content": user_input})
-        st.session_state.messages.insert(1, {"role": "assistant", "content": final_response_text})
-        
         st.session_state.pending_input = ""
 
-    with chat_container:
-        for message in st.session_state.messages:
-            if message["role"] == "user":
-                st.chat_message("user").write(message["content"])
-            elif message["role"] == "assistant":
-                st.chat_message("assistant").write(message["content"])
+        with chat_container:
+            st.chat_message("user").write(user_input)
+            
+            with st.chat_message("assistant"):
+                message_placeholder = st.empty()
+                full_response = ""
+                
+                with st.spinner("Analyzing City Grid..."):
+                    for update in executor.stream({"messages": [("user", user_input)]}, stream_mode="updates"):
+                        if "tools" in update:
+                            messages = update["tools"]["messages"]
+                            for msg in messages:
+                                if hasattr(msg, "name"):
+                                    if msg.name in ["find_single_point_of_failure", "calculate_blast_radius"]:
+                                        try:
+                                            data = json.loads(msg.content)
+                                            if "spof_node" in data and data["spof_node"]:
+                                                st.session_state.spof_node = data["spof_node"]
+                                                st.session_state.offline_nodes = []
+                                            elif "affected_nodes" in data and data["affected_nodes"]:
+                                                st.session_state.offline_nodes = data["affected_nodes"]
+                                                st.session_state.spof_node = None
+                                                
+                                            from graph_renderer import render_macro_graph 
+                                            updated_map = render_macro_graph(
+                                                affected_nodes=st.session_state.offline_nodes, 
+                                                spof_node=st.session_state.spof_node
+                                            )
+                                            map_container.pydeck_chart(updated_map, width="stretch")
+                                        except Exception:
+                                            pass
+                        
+                        if "agent" in update:
+                            messages = update["agent"]["messages"]
+                            for msg in messages:
+                                if hasattr(msg, "content") and msg.content:
+                                    full_response = msg.content
+                                    message_placeholder.markdown(full_response)
+            
+            st.session_state.messages.insert(0, {"role": "assistant", "content": full_response})
+            st.session_state.messages.insert(1, {"role": "user", "content": user_input})
+
+            for message in st.session_state.messages[2:]:
+                st.chat_message(message["role"]).write(message["content"])
+
+    elif not user_input:
+        with chat_container:
+            for message in st.session_state.messages:
+                st.chat_message(message["role"]).write(message["content"])
 
 with col_map:
     # --- PHASE 6: AUTO-REFRESHING HORIZONTAL IOT DASHBOARD (MOVED TO TOP) ---
