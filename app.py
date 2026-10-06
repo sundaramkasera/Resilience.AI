@@ -13,16 +13,21 @@ print("📍 TRACE: app.py - Imports complete")
 print("📍 TRACE: app.py - Setting page config")
 st.set_page_config(layout="wide", page_title="⚡Resilience.AI")
 
+from tigergraph_client import TigerGraphConnectionError
+
 @st.cache_resource
 def init_connection():
-    try:
-        print("📍 TRACE: app.py - Inside init_connection, calling get_tg_connection")
-        return get_tg_connection()
-    except Exception as e:
-        return None
+    print("📍 TRACE: app.py - Inside init_connection, calling get_tg_connection")
+    return get_tg_connection()
 
 print("📍 TRACE: app.py - Calling init_connection")
-conn = init_connection()
+try:
+    conn = init_connection()
+except TigerGraphConnectionError as e:
+    st.toast("Database connection failed. Entering offline mode.", icon="⚠️")
+    conn = None
+except Exception as e:
+    conn = None
 print("📍 TRACE: app.py - Connection initialized")
 
 col_controls, col_map = st.columns([1, 3])

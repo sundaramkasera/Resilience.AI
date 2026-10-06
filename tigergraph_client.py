@@ -1,6 +1,10 @@
 import os
+import time
 import pyTigerGraph as tg
 import traceback
+
+class TigerGraphConnectionError(Exception):
+    pass
 
 def get_tg_connection():
     print("🟢 System: Initializing native pyTigerGraph SDK...")
@@ -10,25 +14,29 @@ def get_tg_connection():
     password = os.getenv("TG_PASSWORD", "")
     secret = os.getenv("TG_SECRET", "")
     
-    try:
-        conn = tg.TigerGraphConnection(
-            host=host, 
-            graphname=graphname, 
-            username=username, 
-            password=password,
-            tgCloud=True
-        )
-        
-        conn.getToken(secret)
-        print("🟢 System: pyTigerGraph token successfully generated!")
-        return conn
-        
-    except Exception as e:
-        print("\n🔴 --- FULL SYSTEM TRACEBACK BELOW --- 🔴")
-        traceback.print_exc()
-        print("🔴 ----------------------------------- 🔴\n")
-        # Returning None instead of raising 'e' so it prints cleanly
-        return None
+    for attempt in range(3):
+        try:
+            conn = tg.TigerGraphConnection(
+                host=host, 
+                graphname=graphname, 
+                username=username, 
+                password=password,
+                tgCloud=True
+            )
+            
+            conn.getToken(secret)
+            print("🟢 System: pyTigerGraph token successfully generated!")
+            return conn
+            
+        except Exception as e:
+            print(f"⚠️ Connection attempt {attempt + 1} failed.")
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+            else:
+                print("\n🔴 --- FULL SYSTEM TRACEBACK BELOW --- 🔴")
+                traceback.print_exc()
+                print("🔴 ----------------------------------- 🔴\n")
+                raise TigerGraphConnectionError("Failed to connect to TigerGraph after 3 attempts.")
 
 # 👇 THIS TRIGGERS THE FUNCTION WHEN YOU RUN THE FILE DIRECTLY 👇
 if __name__ == "__main__":
