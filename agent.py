@@ -3,9 +3,11 @@ import os
 from dotenv import load_dotenv
 from langchain_core.tools import tool
 from langchain_groq import ChatGroq
-from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
+from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate
 from tigergraph_client import get_tg_connection
+from pydantic import BaseModel, Field
+from typing import List, Optional
 
 load_dotenv()
 print("📍 TRACE: agent.py - Imports & load_dotenv complete")
@@ -127,6 +129,12 @@ def run_logistics(query: str) -> str:
     return logistics_executor.invoke({"input": query})["output"]
 
 
+class SimulationResponse(BaseModel):
+    summary: str = Field(description="A clean, professional Commander's Dispatch Brief")
+    spof_node: Optional[str] = Field(None, description="The Single Point of Failure node ID, if applicable")
+    affected_nodes: Optional[List[str]] = Field(default_factory=list, description="List of affected node IDs")
+    logistics_routes: Optional[List[str]] = Field(default_factory=list, description="List of formulated routes")
+
 # --- 3. COMMANDER AGENT (MAIN UI INTERFACE) ---
 def get_resilience_agent():
     commander_system_prompt = """You are the Commander Agent of the Resilience.AI War Room.
@@ -136,25 +144,7 @@ def get_resilience_agent():
     YOUR WORKFLOW:
     1. Delegate grid data gathering to run_power_grid (for SPOF, blast radius, or weather/flood scans).
     2. Delegate routing tasks to run_logistics (e.g., dispatching generators to hospitals affected by the blackout).
-    3. Synthesize their reports into a clean, professional "Commander's Dispatch Brief" for the user.
-    
-    CRITICAL OUTPUT RULES FOR MAP INTEGRATION (PHASES 4, 5, 6):
-    You MUST extract the affected Node IDs or SPOF Node ID from the sub-agents' reports and append a raw JSON block at the VERY END of your response wrapped in exact markdown backticks.
-
-    SCENARIO A: Blast Radius / Simulation
-    ```json
-    {{"affected_nodes": ["Sub-1", "Tower 1", "Hospital 1"]}}
-    ```
-
-    SCENARIO B: SPOF / Vulnerability Scan
-    ```json
-    {{"spof_node": "Sub-3"}}
-    ```
-
-    SCENARIO C: Weather / Flood Assessment
-    ```json
-    {{"affected_nodes": ["Sub-1", "Pump-1", "Pump-2"]}}
-    ```
+    3. Synthesize their reports into a clean, professional "Commander's Dispatch Brief".
     """
     
     commander_prompt = ChatPromptTemplate.from_messages([
@@ -163,14 +153,28 @@ def get_resilience_agent():
         ("placeholder", "{agent_scratchpad}"),
     ])
     
-    # Use the decorated tools here
     commander_tools = [run_power_grid, run_logistics]
     commander_agent = create_tool_calling_agent(llm, commander_tools, commander_prompt)
     
-    return AgentExecutor(
+    executor = AgentExecutor(
         agent=commander_agent, 
         tools=commander_tools, 
         verbose=True, 
         max_iterations=5, 
         handle_parsing_errors=True
     )
+    
+    # We create a chain that takes the executor output and formats it into SimulationResponse
+    # This ensures we get a structured object back
+    format_prompt = ChatPromptTemplate.from_messages([
+        ("system", "Extract the following information from the text and format it into the schema. If no SPOF or affected nodes are mentioned, leave them empty."),
+        ("human", "{text}")
+    ])
+    
+    structured_llm = llm.with_structured_output(SimulationResponse)
+    
+    def run_commander(user_input: str) -> SimulationResponse:
+        result = executor.invoke({"input": user_input})
+        return structured_llm.invoke(format_prompt.format(text=result["output"]))
+        
+    return run_commander

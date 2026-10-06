@@ -69,35 +69,24 @@ with col_controls:
     st.subheader("🚨 War Room Chat")
     
     chat_container = st.container(height=450, border=True)
-
     user_input = st.session_state.pending_input
+
     if user_input and conn:
-        agent_executor = get_resilience_agent()
+        run_commander = get_resilience_agent()
 
         with st.spinner("Analyzing City Grid..."):
-            response = agent_executor.invoke({"input": user_input})
+            response = run_commander(user_input)
 
-        raw_output = response['output']
-        json_pattern = r"```json\s*(\{.*?\})\s*```"
-        match = re.search(json_pattern, raw_output, re.DOTALL)
-
-        if match:
-            final_response_text = re.sub(json_pattern, "", raw_output, flags=re.DOTALL).strip()
-            try:
-                ui_payload = json.loads(match.group(1))
-                
-                if "affected_nodes" in ui_payload:
-                    st.session_state.offline_nodes = ui_payload.get("affected_nodes", [])
-                    st.session_state.spof_node = None
-                    
-                if "spof_node" in ui_payload:
-                    st.session_state.spof_node = ui_payload.get("spof_node")
-                    st.session_state.offline_nodes = []
-                    
-            except Exception as e:
-                print(f"JSON Parsing Error: {e}")
+        final_response_text = response.summary
+        
+        # UI fails silently (no highlight) if spof_node is invalid or empty
+        if response.spof_node:
+            st.session_state.spof_node = response.spof_node
+            st.session_state.offline_nodes = []
+        elif response.affected_nodes:
+            st.session_state.offline_nodes = response.affected_nodes
+            st.session_state.spof_node = None
         else:
-            final_response_text = raw_output
             if "simulate" not in user_input.lower() and "scan" not in user_input.lower() and "weather" not in user_input.lower():
                 st.session_state.offline_nodes = []
                 st.session_state.spof_node = None
