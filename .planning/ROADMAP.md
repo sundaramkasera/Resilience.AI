@@ -10,7 +10,7 @@ This roadmap defines the immediate stabilization efforts for the Resilience.AI p
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Security & Deterministic AI** - Eliminate RCE, secure credentials, and enforce structured outputs.
+- [x] **Phase 1: Security & Deterministic AI** - Eliminate RCE, secure credentials, and enforce structured outputs.
 - [ ] **Phase 2: Concurrency & Performance Optimization** - Fix telemetry race conditions and optimize PyDeck map rendering.
 
 ## Phase Details
@@ -26,9 +26,9 @@ This roadmap defines the immediate stabilization efforts for the Resilience.AI p
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: Remove hardcoded credentials and implement `.env` configuration.
-- [ ] 01-02: Implement explicit LangChain tools and remove `execute_dynamic_python` (`exec()`).
-- [ ] 01-03: Implement `SimulationResponse` schema and `.with_structured_output()`.
+- [x] 01-01: Remove hardcoded credentials and implement `.env` configuration.
+- [x] 01-02: Implement explicit LangChain tools and remove `execute_dynamic_python` (`exec()`).
+- [x] 01-03: Implement `SimulationResponse` schema and `.with_structured_output()`.
 
 ### Phase 2: Concurrency & Performance Optimization
 **Goal**: Ensure sub-second, non-blocking map rendering and atomic state telemetry.
@@ -52,5 +52,5 @@ Phases execute in numeric order: 1 → 2
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Security & Deterministic AI | 0/3 | Not started | - |
+| 1. Security & Deterministic AI | 3/3 | Complete | 2026-10-06 |
 | 2. Concurrency & Performance | 0/3 | Not started | - |
