@@ -42,11 +42,11 @@ Plans:
   2. TigerGraph connection failures surface visibly in the UI and automatically retry.
   3. Map rendering does not block on `time.sleep()`, using separate static and dynamic layers.
 
-**Plans**: 1/3 plans executed
+**Plans**: 2/3 plans executed
 
 Plans:
 - [x] 02-01: Implement `filelock` for atomic writes on `telemetry_stream.json`.
-- [ ] 02-02: Implement exponential backoff retries and UI error surfacing for TigerGraph connections.
+- [x] 02-02: Implement exponential backoff retries and UI error surfacing for TigerGraph connections.
 - [ ] 02-03: Refactor PyDeck map rendering into static cache and dynamic memory layers.
 
 ## Progress
@@ -57,4 +57,4 @@ Phases execute in numeric order: 1 → 2
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Security & Deterministic AI | 3/3 | Complete | 2026-10-06 |
-| 2. Concurrency & Performance | 1/3 | In Progress | - |
+| 2. Concurrency & Performance | 2/3 | In Progress | - |
